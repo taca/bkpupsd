@@ -3,8 +3,6 @@
 # Date created:         30 August 2000
 # Whom:                 taca
 #
-# $Id: Makefile,v 1.2 2002/12/21 17:44:04 taca Exp $
-#
 
 PORTNAME= bkpupsd
 PORTVERSION= 2.0pl3
