@@ -1,8 +1,0 @@
-etc/rc.d/bkpupsd.sh.sample
-etc/upstab
-sbin/bkpupsd
-libexec/bkpupsd/battery.shutdown
-libexec/bkpupsd/line.lost
-libexec/bkpupsd/line.recover
-libexec/bkpupsd/line.shutdown
-@dirrm libexec/bkpupsd
