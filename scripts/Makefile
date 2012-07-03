@@ -1,6 +1,5 @@
-# $Id: Makefile,v 1.18 2006/08/22 04:15:58 taca Exp $
 #
-# Copyright (C) 2003, 2004, 2005, 2006 Takahiro Kambe
+# Copyright (C) 2003-2012 Takahiro Kambe
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without

@@ -1,7 +1,5 @@
 /*
- * $Id: main.c,v 1.24 2006/09/29 07:29:47 taca Exp $
- *
- * Copyright (C) 2003, 2004, 2005, 2006 Takahiro Kambe
+ * Copyright (C) 2003-2012 Takahiro Kambe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -56,10 +54,6 @@
  * SUCH DAMAGE.
  *
  */
-#include <sys/cdefs.h>
-#ifndef lint
-__RCSID("$Id: main.c,v 1.24 2006/09/29 07:29:47 taca Exp $");
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

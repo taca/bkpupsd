@@ -1,7 +1,5 @@
 /*
- * $Id: ups.c,v 1.23 2006/08/22 06:13:47 taca Exp $
- *
- * Copyright (C) 2003, 2004, 2005, 2006 Takahiro Kambe
+ * Copyright (C) 2003-2012 Takahiro Kambe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,10 +27,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <sys/cdefs.h>
-#ifndef lint
-__RCSID("$Id: ups.c,v 1.23 2006/08/22 06:13:47 taca Exp $");
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>

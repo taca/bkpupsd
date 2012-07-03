@@ -1,6 +1,5 @@
-# $Id: Makefile.inc.NetBSD,v 1.7 2006/08/22 04:38:21 taca Exp $
 #
-# Copyright (C) 2003, 2004, 2005, 2006 Takahiro Kambe
+# Copyright (C) 2003-2012 Takahiro Kambe
 # All rights reserved.
 #
 # Makefile.inc for NetBSD

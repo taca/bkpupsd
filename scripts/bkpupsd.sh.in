@@ -1,5 +1,4 @@
 #!/bin/sh
-# $Id: bkpupsd.sh.in,v 1.6 2006/08/22 04:16:41 taca Exp $
 #
 prefix="%%prefix%%"
 device="%%device%%"

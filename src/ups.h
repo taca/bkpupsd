@@ -1,7 +1,5 @@
 /*
- * $Id: ups.h,v 1.7 2006/08/22 04:18:25 taca Exp $
- *
- * Copyright (C) 2003, 2004, 2005, 2006 Takahiro Kambe
+ * Copyright (C) 2003-2012 Takahiro Kambe
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

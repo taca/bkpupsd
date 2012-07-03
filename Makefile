@@ -1,6 +1,5 @@
-# $Id: Makefile,v 1.15 2006/08/22 04:38:21 taca Exp $
 #
-# Copyright (C) 2003, 2004, 2005, 2006 Takahiro Kambe
+# Copyright (C) 2003-2012 Takahiro Kambe
 # All rights reserved.
 #
 OPSYS!=	uname -s

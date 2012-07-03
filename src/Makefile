@@ -1,6 +1,5 @@
-# $Id: Makefile,v 1.19 2006/08/22 06:07:36 taca Exp $
 #
-# Copyright (C) 2003, 2004, 2005, 2006 Takahiro Kambe
+# Copyright (C) 2003-2012 Takahiro Kambe
 # All rights reserved.
 #
 # bkpupsd - Simple UPS daemon for APC Back-UPS Pro. series
