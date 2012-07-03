@@ -1,0 +1,15 @@
+# $Id: Makefile.inc.FreeBSD,v 1.6 2006/08/22 04:38:21 taca Exp $
+#
+# Copyright (C) 2003, 2004, 2005, 2006 Takahiro Kambe
+# All rights reserved.
+#
+# Makefile.inc for FreeBSD
+#
+PREFIX=		/usr/local
+BINDIR=		${PREFIX}/sbin
+DEFAULT_DEVICE?=/dev/cuaa0
+MANDIR=		${PREFIX}/man/man
+OPTIM=		-g
+CFLAGS+=	-Wall -Wformat -Wpointer-arith -Wstrict-prototypes
+CFLAGS+=	-Wmissing-prototypes -Wunused -Wuninitialized
+SED?=		sed

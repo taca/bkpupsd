@@ -1,0 +1,24 @@
+#!/bin/sh
+# $Id: bkpupsd.sh.in,v 1.6 2006/08/22 04:16:41 taca Exp $
+#
+prefix="%%prefix%%"
+device="%%device%%"
+sbindir="${prefix}/sbin"
+progname=bkpupsd
+ups=""
+options=""
+
+pathname="${sbindir}/${progname}"
+
+if [ -x ${pathname} -a -n ${ups} ]; then
+	case $1 in
+	start)
+		${pathname} $options $ups:$device; echo -n " ${progname}";;
+	stop)
+		pidfile="/var/run/${progname}.pid"
+		if [ -f ${pidfile} ]
+		then
+			kill `cat ${pidfile}`
+		fi;;
+	esac
+fi

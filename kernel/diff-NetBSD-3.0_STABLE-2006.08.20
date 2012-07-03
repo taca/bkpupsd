@@ -1,0 +1,351 @@
+Index: conf/files
+===================================================================
+RCS file: /cvs/src-3.0/sys/conf/files,v
+retrieving revision 1.1.1.8
+retrieving revision 1.4.2.1
+diff -d -u -p -r1.1.1.8 -r1.4.2.1
+--- conf/files	17 Apr 2006 08:58:55 -0000	1.1.1.8
++++ conf/files	17 Apr 2006 10:24:35 -0000	1.4.2.1
+@@ -712,7 +713,7 @@ file	dev/ic/ne2000.c			ne | ipkdb_ne
+ #
+ defflag	opt_com.h		COM_DEBUG COM_MPLOCK
+ # XXX In a perfect world, this would be done with attributes
+-defflag	opt_com.h		COM_16650 COM_HAYESP COM_PXA2X0
++defflag	opt_com.h		COM_16650 COM_HAYESP COM_PXA2X0 COM_UPS
+ device	com { } : tty
+ file	dev/ic/com.c			com			needs-flag
+ 
+Index: kern/kern_subr.c
+===================================================================
+RCS file: /cvs/src-3.0/sys/kern/kern_subr.c,v
+retrieving revision 1.1.1.2
+retrieving revision 1.3
+diff -d -u -p -r1.1.1.2 -r1.3
+--- kern/kern_subr.c	31 Dec 2005 12:00:33 -0000	1.1.1.2
++++ kern/kern_subr.c	31 Dec 2005 12:58:14 -0000	1.3
+@@ -88,6 +88,7 @@
+ #include <sys/cdefs.h>
+ __KERNEL_RCSID(0, "$NetBSD: kern_subr.c,v 1.115.6.1 2005/12/29 20:00:12 riz Exp $");
+ 
++#include "opt_com.h"
+ #include "opt_ddb.h"
+ #include "opt_md.h"
+ #include "opt_syscall_debug.h"
+@@ -129,6 +130,9 @@ struct hook_desc {
+ typedef LIST_HEAD(, hook_desc) hook_list_t;
+ 
+ static void *hook_establish(hook_list_t *, void (*)(void *), void *);
++#ifdef COM_UPS
++static void *hook_last_establish __P((hook_list_t *, void (*) __P((void *)), void *));
++#endif
+ static void hook_disestablish(hook_list_t *, void *);
+ static void hook_destroy(hook_list_t *);
+ static void hook_proc_run(hook_list_t *, struct proc *);
+@@ -430,6 +434,30 @@ hook_establish(list, fn, arg)
+ 	return (hd);
+ }
+ 
++#ifdef COM_UPS
++static void *
++hook_last_establish(list, fn, arg)
++	hook_list_t *list;
++	void (*fn) __P((void *));
++	void *arg;
++{
++	struct hook_desc *hd, *p, *n;
++
++	hd = malloc(sizeof(*hd), M_DEVBUF, M_NOWAIT);
++	if (hd == NULL)
++		return (NULL);
++
++	hd->hk_fn = fn;
++	hd->hk_arg = arg;
++	p = LIST_FIRST(list);
++	while ((n = LIST_NEXT(p, hk_list)) != NULL)
++		p = n;
++	LIST_INSERT_AFTER(p, hd, hk_list);
++
++	return (hd);
++}
++#endif
++
+ static void
+ hook_disestablish(list, vhook)
+ 	hook_list_t *list;
+@@ -496,6 +524,16 @@ shutdownhook_establish(fn, arg)
+ 	return hook_establish(&shutdownhook_list, fn, arg);
+ }
+ 
++#ifdef COM_UPS
++void *
++shutdownhook_last_establish(fn, arg)
++	void (*fn) __P((void *));
++	void *arg;
++{
++	return hook_last_establish(&shutdownhook_list, fn, arg);
++}
++#endif
++
+ void
+ shutdownhook_disestablish(vhook)
+ 	void *vhook;
+@@ -503,6 +541,7 @@ shutdownhook_disestablish(vhook)
+ 	hook_disestablish(&shutdownhook_list, vhook);
+ }
+ 
++
+ /*
+  * Run shutdown hooks.  Should be invoked immediately before the
+  * system is halted or rebooted, i.e. after file systems unmounted,
+Index: sys/Makefile
+===================================================================
+RCS file: /cvs/src-3.0/sys/sys/Makefile,v
+retrieving revision 1.1.1.1
+retrieving revision 1.2
+diff -d -u -p -r1.1.1.1 -r1.2
+--- sys/Makefile	23 Mar 2005 16:45:34 -0000	1.1.1.1
++++ sys/Makefile	16 Sep 2005 12:00:22 -0000	1.2
+@@ -46,4 +46,6 @@ INCSYMLINKS=\
+ 
+ INCSYMLINKS+=	../soundcard.h ${INCSDIR}/soundcard.h
+ 
++INCS+=	com_ups.h
++
+ .include <bsd.kinc.mk>
+Index: sys/com_ups.h
+===================================================================
+RCS file: sys/com_ups.h
+diff -N sys/com_ups.h
+--- /dev/null	1 Jan 1970 00:00:00 -0000
++++ sys/com_ups.h	22 Aug 2006 02:42:48 -0000
+@@ -0,0 +1,44 @@
++/* $Id: diff-NetBSD-3.0_STABLE-2006.08.20,v 1.1 2006/08/22 04:08:53 taca Exp $ */
++
++/*
++ * Copyright (C) 2003, 2004, 2005, 2006 Takahiro Kambe
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. Neither the name of the auhor nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR(S) ``AS IS'' AND ANY
++ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR(S) BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
++ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
++ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
++ * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
++ * DAMAGE.
++ */
++
++#ifndef	_COM_UPS_H_
++#define	_COM_UPS_H_
++
++#ifndef KERNEL
++#include <sys/types.h>
++#endif
++#include <sys/ioccom.h>
++
++#define UPSIOC_GET	_IOR('u', 1, int)	/* get ups */
++#define UPSIOC_SET	_IOW('u', 2, int)	/* set ups */
++
++#endif /* !_COM_UPS_H_ */
+Index: sys/systm.h
+===================================================================
+RCS file: /cvs/src-3.0/sys/sys/systm.h,v
+retrieving revision 1.1.1.3
+retrieving revision 1.4
+diff -d -u -p -r1.1.1.3 -r1.4
+--- sys/systm.h	23 Jan 2006 05:01:01 -0000	1.1.1.3
++++ sys/systm.h	23 Jan 2006 06:49:07 -0000	1.4
+@@ -285,6 +286,9 @@ void	setstatclockrate(int);
+  * immediately before the system is halted or rebooted.
+  */
+ void	*shutdownhook_establish(void (*)(void *), void *);
++#ifdef COM_UPS
++void	*shutdownhook_last_establish __P((void (*)(void *), void *));
++#endif
+ void	shutdownhook_disestablish(void *);
+ void	doshutdownhooks(void);
+ 
+Index: dev/ic/com.c
+===================================================================
+RCS file: /cvs/src-3.0/sys/dev/ic/com.c,v
+retrieving revision 1.1.1.1
+retrieving revision 1.2.2.2
+diff -d -u -p -r1.1.1.1 -r1.2.2.2
+--- dev/ic/com.c	23 Mar 2005 16:44:32 -0000	1.1.1.1
++++ dev/ic/com.c	21 Aug 2006 06:24:24 -0000	1.2.2.2
+@@ -132,6 +132,10 @@ __KERNEL_RCSID(0, "$NetBSD: com.c,v 1.23
+ #include <dev/ic/hayespreg.h>
+ #endif
+ #define	com_lcr	com_cfcr
++#ifdef COM_UPS
++#include <sys/reboot.h>
++#include <sys/com_ups.h>
++#endif
+ #include <dev/cons.h>
+ 
+ #ifdef COM_HAYESP
+@@ -147,6 +151,12 @@ static	u_char	cflag2lcr(tcflag_t);
+ int	comparam(struct tty *, struct termios *);
+ void	comstart(struct tty *);
+ int	comhwiflow(struct tty *, int);
++#ifdef COM_UPS
++static void com_ups_shutdown (void *);
++
++static int com_ups_debug = 0;
++static int com_ups_sleep = 30000000; /* 30 sec */
++#endif
+ 
+ void	com_loadchannelregs(struct com_softc *);
+ void	com_hwiflow(struct com_softc *);
+@@ -543,6 +553,9 @@ com_attach_subr(struct com_softc *sc)
+ 		sc->sc_fifolen = 1;
+ 		aprint_normal("%s: txfifo disabled\n", sc->sc_dev.dv_xname);
+ 	}
++#ifdef COM_UPS
++	aprint_normal("%s: with ups support\n", sc->sc_dev.dv_xname);
++#endif
+ #ifdef COM_HAYESP
+ 	}
+ #endif
+@@ -563,6 +576,11 @@ com_attach_subr(struct com_softc *sc)
+ 	}
+ 	sc->sc_ebuf = sc->sc_rbuf + (com_rbuf_size << 1);
+ 
++#ifdef COM_UPS
++	sc->ups_bits = 0;
++	sc->ups_hook = NULL;
++#endif
++
+ 	tty_attach(tp);
+ 
+ 	if (!ISSET(sc->sc_hwflags, COM_HW_NOIEN))
+@@ -765,6 +783,12 @@ com_shutdown(struct com_softc *sc)
+ 	sc->sc_ppsmask = 0;
+ 	sc->ppsparam.mode = 0;
+ 
++#ifdef COM_UPS
++	if (sc->ups_hook) {
++		splx(s);
++		return;
++	}
++#endif
+ 	/*
+ 	 * Hang up if necessary.  Wait a bit, so the other side has time to
+ 	 * notice even if we immediately open the port again.
+@@ -809,6 +833,23 @@ com_shutdown(struct com_softc *sc)
+ 	splx(s);
+ }
+ 
++#ifdef COM_UPS
++static void
++com_ups_shutdown(void *data)
++{
++	struct com_softc *sc = data;
++
++	if (sc->ups_hook && (boothowto & RB_HALT) == RB_HALT) {
++		printf("%s: shutting down ups ... ", sc->sc_dev.dv_xname);
++		tiocm_to_com(sc, TIOCMSET, sc->ups_bits);
++		delay(com_ups_sleep);
++		printf("Done.\n");
++	}
++	sc->ups_hook = NULL;
++	com_shutdown(sc);
++}
++#endif
++
+ int
+ comopen(dev_t dev, int flag, int mode, struct proc *p)
+ {
+@@ -1211,6 +1252,22 @@ comioctl(dev_t dev, u_long cmd, caddr_t 
+ #endif
+ 		break;
+ 
++#ifdef COM_UPS
++	case UPSIOC_GET:
++		*(int *)data = sc->ups_bits;
++		break;
++	case UPSIOC_SET:
++		error = suser(p->p_ucred, &p->p_acflag); 
++		if (error)
++			break;
++		sc->ups_bits = *(int *)data;
++		if (sc->ups_bits)
++			sc->ups_hook = shutdownhook_last_establish(com_ups_shutdown, sc);
++		else
++			shutdownhook_disestablish(sc->ups_hook);
++		break;
++#endif
++
+ 	default:
+ 		error = EPASSTHROUGH;
+ 		break;
+@@ -1293,6 +1350,11 @@ void
+ tiocm_to_com(struct com_softc *sc, u_long how, int ttybits)
+ {
+ 	u_char combits;
++#ifdef COM_UPS
++	u_char mcr;
++
++	mcr = sc->sc_mcr;
++#endif
+ 
+ 	combits = 0;
+ 	if (ISSET(ttybits, TIOCM_DTR))
+@@ -1315,6 +1377,11 @@ tiocm_to_com(struct com_softc *sc, u_lon
+ 		break;
+ 	}
+ 
++#ifdef COM_UPS
++	if (com_ups_debug)
++		printf("%s: set mcr %03o: %03o => %03o\n",
++		       sc->sc_dev.dv_xname, ttybits, mcr, sc->sc_mcr);
++#endif
+ 	if (!sc->sc_heldchange) {
+ 		if (sc->sc_tx_busy) {
+ 			sc->sc_heldtbc = sc->sc_tbc;
+@@ -1627,6 +1694,10 @@ com_loadchannelregs(struct com_softc *sc
+ 	bus_space_write_1(iot, ioh, com_dlbl, sc->sc_dlbl);
+ 	bus_space_write_1(iot, ioh, com_dlbh, sc->sc_dlbh);
+ 	bus_space_write_1(iot, ioh, com_lcr, sc->sc_lcr);
++#ifdef COM_UPS
++	if (com_ups_debug)
++		printf("%s: mcr => %03o\n", sc->sc_dev.dv_xname, sc->sc_mcr);
++#endif
+ 	bus_space_write_1(iot, ioh, com_mcr, sc->sc_mcr_active = sc->sc_mcr);
+ 	bus_space_write_1(iot, ioh, com_fifo, sc->sc_fifo);
+ #ifdef COM_HAYESP
+Index: dev/ic/comvar.h
+===================================================================
+RCS file: /cvs/src-3.0/sys/dev/ic/comvar.h,v
+retrieving revision 1.1.1.1
+retrieving revision 1.2
+diff -d -u -p -r1.1.1.1 -r1.2
+--- dev/ic/comvar.h	23 Mar 2005 16:44:32 -0000	1.1.1.1
++++ dev/ic/comvar.h	16 Sep 2005 12:00:12 -0000	1.2
+@@ -152,6 +152,10 @@ struct com_softc {
+ #if (defined(MULTIPROCESSOR) || defined(LOCKDEBUG)) && defined(COM_MPLOCK)
+ 	struct simplelock	sc_lock;
+ #endif
++#ifdef COM_UPS
++	int	ups_bits;
++	void	*ups_hook;
++#endif
+ };
+ 
+ /* Macros to clear/set/test flags. */

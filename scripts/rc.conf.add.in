@@ -1,0 +1,5 @@
+# $Id: rc.conf.add.in,v 1.1 2006/08/22 04:15:58 taca Exp $
+bkpupsd=NO
+bkpupsd_device="%%device%%"
+bkpupsd_ups="null"
+bkpupsd_options=""

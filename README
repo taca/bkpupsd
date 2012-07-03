@@ -1,0 +1,286 @@
+README for bkpupsd 2.2.0
+
+bkpupsd -- simple UPS daemon
+
+					2006/8/22
+					Takahiro Kambe <taca@back-street.net>
+
+1. Overview
+
+Bkpupsd is a program to monitor and control UPS.  bkpupsd is designed
+for FreeBSD 2.2.8 and NetBSD 1.4 and later.  It monitor and control
+UPS through the serial port with modem control bits.  Bkpupsd has
+tested with BK 350/500 by American Power Conversion Corp and FREQUPS A/F
+series made by Mitsubishi Electric Corp.
+
+
+2. Disclaimer
+
+I cannot warranty or guarantee any of these programs or informations
+will work properly for you.  Controling UPS is a tricky business.  If
+anything is damaged, I take *NO RESPONSIBILITY*.  Please use it at your
+own risks.
+
+Since bkpupsd is developed by users, don't ask the UPS vendor about
+bkpupsd.
+
+The information about monitoring and controling APC's UPS was obtained
+only with observation of serial port status, reverse-engineering.
+
+And I have refered apcupsd's Web page,
+
+	http://www.brisse.dk/site/apcupsd/
+
+Apcupsd is a great program which achives real management of APC's UPS.
+Now it might be  available as a package(ports or pkg) on some BSD
+environment.
+
+
+3. The interface cable
+
+The interface cable connecting UPS to computer serial port must be
+compatible with manufacturer's interface kits.
+
+For BK Pro series, 940-0095A dual purpose cable and 940-0020B simple
+cable works.  For BK series, only 940-0020B works.
+
+BK Pro series may be shipped with 940-0095B cable.  Though APC says
+this is compatible with 940-0095A when using their software, it seems
+that 940-0095B can't report battery low status appropriately.  So, you
+must use bkpupsd with "bkpro-b" for UPS type.
+
+For FREQUPS A/F series, an interface cable is normal cross (reverse)
+RS232C cable.  (FREQUPS F model bundles the cable.)
+
+
+4. Tested model of UPS
+
+I've tested bkpupsd 2.0 on those UPSs bellow:
+
+	o BK 350J and BK pro 500 by American Power Conversion Corp.
+	o FREQUPS F series (FW-F10-0.5K) by Mitsubishi Electric Corp.
+	o FREQUPS A series (FW-A10L-1.0K) by Mitsubishi Electric Corp.
+
+Any other model is not tested at all.
+
+Unlike previous version (1.4.2), bkpupsd 2.0 read parameter for UPS
+from upstab, UPS table file.  And some options are changed from 1.4.2,
+so please read manual (or source file) and check what you want to do.
+
+Some UPS, like BK series needs to modify kernel in order to complete
+graceful shutdown.  Patches for kernel is provided under "kernel"
+directory, see kernel/READEME file.  If you don't or can't modify your
+kenrel, create a new entry for your UPS in upstab with "kernel"
+capability enabled.
+
+FREQUPS F series have dip switches and their behavior can be modified.
+Its dip switch #2 must be set ON, and here is its dip switches summary.
+(Older model dosen't have dip switch #5 and #6.)
+
+
+	SW1:	ON	You can shutdown by UPS's power switch.
+	SW2:	ON	You must be set it on.
+	SW3:	OFF	Keep the default.
+	SW4:	ON	This enables UPS's reboot function.
+	SW5:	OFF	Keep the dafault.
+	SW6:	OFF	Keep the dafault.
+
+FREQUPS A series have dip switches and their behavior can be modified.
+bkpupsd dosen't support "Serial communication" mode but only "Network
+OS management" mode; dip switch #1 should be left off.
+
+	SW1:	OFF	Use Network OS management mode (default).
+	SW2:	OFF	Keep the default.
+	SW3:	OFF	Keep the default.
+	SW4:	OFF	Use the default. (*)
+	SW5:	ON	You can shutdown by UPS's power switch.
+	SW6:	OFF	Use the default. (*)
+
+	* Read the manual for setting of thses dip switches.
+
+Please read the manual of the UPS for further information.
+
+If you have other UPS which controled by RS-232C's signal status,
+controlled by modem control bits, then try to "null" UPS type.  And
+check syslog's LOGDEBUG level, to what gose on when you plug off line
+or UPS's battery gose low.  Althoguh you need to know how to make sleep
+your UPS by another way, now you might create an entry of upstab and
+monitor your UPS.
+
+
+5. Install
+
+  1. Unpack the archive.
+
+  2. If you want to use BK (without `Pro') series, you need to change
+     your kenrel using patch file under kernel directory.  Here is an
+     example for FreeBSD 2.2.8.
+
+	# (cd /usr/src; patch -p) < kernel/diff-FreeBSD-2.2.8
+	# (cd /usr/src; make includes)
+
+     If you are using NetBSD 3.0,
+
+	# (cd /usr/src; patch -p) < kernel/diff-NetBSD-3.0_STABLE-2006.08.20
+	# cd /usr/src/sys/sys; make includes
+	# cd /usr/src; sh build.sh -u kernel="YOUR-KERNEL"
+
+   Other version of *BSD systems, hack your kernel please.  :-) 
+
+  3. Now you can compile bkpupsd.
+
+	# make depend
+	# make
+	# make install
+
+     Following files will be installed:
+
+	- bkpupsd	- ups monitoring and controling program
+		/usr/local/sbin/bkpupsd
+
+	- scripts
+		/usr/local/libexec/bkpupsd/
+			battery.shutdown
+			line.lost
+			line.recover
+			line.shutdown
+	- manual
+		/usr/local/man/man8/bkpupsd.8
+
+	- a sample startup script
+		/usr/local/etc/bkpupsd.sh.sample
+
+
+6. How to set up
+
+What you need to do is summerized as followings:
+
+	1. Plug the PC power plug into the UPS power output.
+	2. Connect the PC's serial port to the UPS interface port.
+	3. Plug the UPS power input plug into wall power socket.
+	4. Run bkpupsd on the PC.
+
+According to your system environments, settings may be varied.  The
+followings are only examples of setting up.
+
+  1. Copy a sample startup script to the real place:
+
+	# cd /usr/local/etc/rc.d
+	# cp bkpupsd.sh.sample bkpupsd.sh
+
+  2. Edit the startup script.  Change the device if you need, and set
+     type of the UPS and its options.
+
+	device="-f /dev/dty01"
+	ups="freqf"
+	options=""
+
+     This is an example for FREQUPS F series.  If you use BK Pro
+     series with 940-0095A cable, use "bkpro", if you use 940-0020B
+     simple cable, use "bk", instead of "freqf".
+
+     If your UPS reports low battery immediately when you plug off
+     the UPS's power line, create new UPS entry in upstab(5) without
+     "low" capability and "-t timeout" option with appropriate timeout
+     value.
+
+     Please read bkpupsd(8) for checking options, and read upstab(5)
+     for UPS capability change.
+
+  3. Add the startup script in /etc/rc.local.  (NetBSD only)
+
+	# Start up bkpupsd.
+	if [ -x /usr/local/etc/rc.d/bkpupsd.sh ]; then
+		sh /usr/local/etc/rc.d/bkpupsd.sh start
+	fi
+
+  4. Shutdown the system.
+  5. Switch off the PC.
+  6. Connect the PC's serial port1 to the UPS computer interface port.
+  7. Plug the PC's power plug into the UPS power output.
+  8. Plug the UPS power input into wall power socket.
+  9. Turn on the UPS.
+  10. Turn on the PC.
+
+Connecting PC to UPS is a very tricky business.  You had better test
+the setting many times.  Pulling off and plugging in the UPS power
+input to wall socket, check that the PC displays warning and recovery
+message and the light stays on.  Pulling off the UPS power input for 6
+to 40 minutes, check that the PC shutdown the system itself properly.
+After the shutdown, the UPS goes into sleep and the light also goes
+off.  Plugging the UPS power input to the socket after that events, the
+UPS wake up and the light goes on again.
+
+
+7. Notes
+
+Porting this program to linux or same other System V like OS is not
+recommanded.  Bkpupsd is designed for BSD based OS and not supporting
+System V SIGPWR and SysV init features.  There are more powerful UPSd
+programs for linux.
+
+I used some cable information from apcupsd's Web page much.
+
+Please inform me, if you find any bugs or security holes of this
+program.
+
+
+8. Special Thanks
+
+Thanks to Yoshifumi Watanabe <mwatts@edu1.tokyo-med.ac.jp> who wrote
+initial version of bkpupsd program.
+
+Special thanks to Mitsubishi Electric Corp., for lending their excellent
+products, FREQUPS F series (FW-F10-0.5K) for a long term, FREQUPS A series
+(FW-A10L-1.0K), and gave useful advise.
+
+Thanks to Naoki IDO <ido@hitachi-ms.co.jp> who tested kernel change on
+FreeBSD 3.4 and sent me the patch.
+
+Thanks to Kazushi (Jam) Marukawa <jam@pobox.com> who telled me some
+problem of README.jp document.
+
+Thanks for yrsh2scp@mbox.nc.kyushu-u.ac.jp (Yoshifumi R. Shimizu)
+who proposed me improvement of shutdown sequence.  And I received
+files for FreeBSD's new layout ports, too.
+
+Thanks for MASUDA Hideo <h-masuda@ootani.nagata.kobe.jp> who gave me
+running with OMRON's BX75XS UPS.
+
+Thanks for Smart Field Corp. for giving me to chance to continue to
+develope bkpupsd.
+
+And, thanks to all NetBSD and FreeBSD community.
+
+
+9. Copyright
+
+Copyright (C) 2003, 2004, 2005, 2006 Takahiro Kambe
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+3. Neither the name of the author nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.
+
+$Id: README,v 1.28 2006/08/22 04:38:46 taca Exp $

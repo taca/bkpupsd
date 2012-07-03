@@ -1,0 +1,116 @@
+bkpupsd-1.0a
+
+	bkpupsd ver. 1.0 A
+	The UPS daemon for APC Back-UPS Pro series
+
+README file
+Aug. 3 1997.
+
+
+1. Overview
+
+	The bkpupsd is a program to monitor and control UPS.
+bkpupsd is designed for FreeBSD 2.2.1R and work with APC Back-UPS Pro.
+ 300 and 500 J plug and play model.
+
+
+
+2. Disclaimer
+
+	I cannot warranty or guarantee any of these programs or
+ informations will work properly for you.  Controling UPS is a tricky
+business.  If anything is damaged, I take NO RESPONSIBILITY. Please use
+it at your own risks.
+	The informations based on this program are obtained only with
+reverse-engineering. So, accuracy of my informations is not certain.
+I am a doctor, not a computer engineer. :-) I may have made mistake.
+Please be careful.
+
+
+
+3. The interface cable
+
+	The interface cable connecting UPS to computer serial port must
+be compatible with manufacturer's interface kits.  I do not know about
+how connected lines of the cable internally.
+
+
+
+4. Tested model of UPS
+
+	APC Back-UPS Pro. series
+		1. BK-Pro 300J PnP
+		2. BK-Pro 500J PnP
+Any other model is not tested.  These UPSes are working good with my
+server PCs for 3 months by now.
+
+
+5. Install
+
+	This program code is very simple. After untar the "bkpupsd-1.0",
+you should just excute a "make" command under this directory.  "make install"
+will install following files:
+	1. bkpupsd	- upsd program
+		/usr/local/sbin/bkpupsd
+	2. scripts
+		/usr/local/libexec/bkpupsd/
+			bkpups.failed
+			bkpups.restored
+			bkpups.shutdown
+			bkpups.battlow
+	3. manual
+		/usr/local/man/man8/bkpupsd.8
+
+
+8. How to set up
+
+	What you need to do is summerized as followings:
+	1. Plug the PC power plug into the UPS power output.
+	2. Connect the PC's serial port to the UPS interface port.
+	3. Plug the UPS power input plug into wall power socket.
+	4. Run bkpupsd on the PC.
+
+	According to your system environments, settings may be varied.
+	The followings are only examples of setting up.
+	1. Edit /etc/rc.local. Append something like followings:
+		# Start up bkpupsd.
+		if [ -x /usr/local/sbin/bkpupsd ]; then
+			echo 'Starting bkpupsd.'
+			/usr/local/sbin/bkpupsd /dev/cuaa0
+		fi
+	2. Shutdown the system.
+	3. Switch off the PC.
+	4. Connect the PC's serial port1 to the UPS computer interface port.
+	5. Plug the PC's power plug into the UPS power output.
+	6. Plug the UPS power input into wall power socket.
+	7. Turn on the UPS.
+	8. Turn on the PC.
+
+	I recommand you to run some test, before you plug the PC power to
+the UPS using dummy load like a light.  Connecting PC to UPS is a very tricky
+business. You would better to test the setting many times.  Pulling off and
+plugging in the UPS power input to wall socket, check that the PC displays
+warning and recovery message and the light stays on.  Pulling off the UPS
+power input for 6 to 7 minutes, check that the PC shutdown the system itself
+properly. After the shutdown, the UPS goes into sleep and the light also
+goes off.  Plugging the UPS power input to the socket after that events, the
+UPS wake up and the light goes on again.
+
+
+7. Notes
+
+	Porting this program for linux or same other Sys V OS is not
+recommanded.  This upsd is designed for BSD OS and not supporting Sys V
+SIGPWR and SysVinit features.  There are more powerful UPSd programs for
+linux.  Please use these ports.
+
+	I used informations of linux "The UPS Howto" by Harvey J. Stein,
+et al. and Alexis Yushin's experimental upsd.  I would like to say "Thank you"
+to them.
+	Please inform me, if you find any bugs or security holes of this
+program.
+
+
+Yoshifumi Watanabe
+<mwatts@edu1.tokyo-med.ac.jp>
+Tokyo Medical College Hospital

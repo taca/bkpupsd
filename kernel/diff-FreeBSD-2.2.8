@@ -1,0 +1,329 @@
+$Id: diff-FreeBSD-2.2.8,v 1.4 2000/09/27 09:05:03 taca Exp $
+Index: sys/i386/conf/options.i386
+===================================================================
+RCS file: /usr/local/libdata/cvs/src/sys/i386/conf/options.i386,v
+retrieving revision 1.1.1.1
+diff -u -u -r1.1.1.1 options.i386
+--- options.i386	1999/05/21 11:40:37	1.1.1.1
++++ options.i386	2000/02/01 10:26:40
+@@ -1,4 +1,4 @@
+-#	$Id: diff-FreeBSD-2.2.8,v 1.4 2000/09/27 09:05:03 taca Exp $
++# $FreeBSD: src/sys/i386/conf/options.i386,v 1.26.2.20 1999/09/05 08:10:54 peter Exp $
+ BOUNCEPAGES		opt_bounce.h
+ USER_LDT
+ MATH_EMULATE		opt_math_emulate.h
+@@ -21,6 +21,7 @@
+ COM_ESP			opt_sio.h
+ COM_MULTIPORT		opt_sio.h
+ DSI_SOFT_MODEM		opt_sio.h
++COM_UPS			opt_sio.h
+ I586_CTR_GUPROF		opt_i586_guprof.h
+ I586_PMC_GUPROF		opt_i586_guprof.h
+ WLCACHE			opt_wavelan.h
+Index: sys/i386/isa/sio.c
+===================================================================
+RCS file: /usr/local/libdata/cvs/src/sys/i386/isa/sio.c,v
+retrieving revision 1.1.1.1
+diff -u -u -r1.1.1.1 sio.c
+--- sio.c	1999/05/21 11:40:48	1.1.1.1
++++ sio.c	2000/02/01 10:33:21
+@@ -31,7 +31,7 @@
+  * SUCH DAMAGE.
+  *
+  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
+- *	$Id: diff-FreeBSD-2.2.8,v 1.4 2000/09/27 09:05:03 taca Exp $
++ * $FreeBSD: src/sys/i386/isa/sio.c,v 1.147.2.17 1999/09/05 08:13:30 peter Exp $
+  */
+ 
+ #include "opt_comconsole.h"
+@@ -98,6 +98,10 @@
+ #include <i386/isa/pnp.h>
+ #endif
+ 
++#if COM_UPS > 0
++#include <sys/com_ups.h>
++#endif
++
+ #define	LOTS_OF_EVENTS	64	/* helps separate urgent events from input */
+ #define	RB_I_HIGH_WATER	(TTYHOG - 2 * RS_IBUFSIZE)
+ #define	RS_IBUFSIZE	256
+@@ -281,6 +285,9 @@
+ 	void	*devfs_token_cual;
+ 	void	*devfs_token_cuai;
+ #endif
++#if COM_UPS > 0
++	int	ups_bits;
++#endif
+ };
+ 
+ /*
+@@ -385,6 +392,10 @@
+ static	Port_t	likely_esp_ports[] = { 0x140, 0x180, 0x280, 0 };
+ #endif
+ 
++#if COM_UPS > 0
++static void ups_shutdown __P((int howto, void *data));
++#endif
++
+ #if NCARD > 0
+ /*
+  *	PC-Card (PCMCIA) specific code.
+@@ -1547,6 +1558,7 @@
+ 	int		oldcmd;
+ 	struct termios	term;
+ #endif
++	int		status;
+ 
+ 	mynor = minor(dev);
+ 	com = com_addr(MINOR_TO_UNIT(mynor));
+@@ -1705,9 +1717,26 @@
+ 		com->do_dcd_timestamp = TRUE;
+ 		*(struct timeval *)data = com->dcd_timestamp;
+ 		break;
++#if COM_UPS > 0
++	case UPSIOC_GET:
++		*(int *)data = com->ups_bits;
++		break;
++	case UPSIOC_SET:
++		error = suser(p->p_ucred, &p->p_acflag);
++		if (error != 0)
++			return (error);
++		com->ups_bits = *(int *)data;
++		if (com->ups_bits) {
++			error = at_shutdown(ups_shutdown, com, SHUTDOWN_HALT);
++		} else {
++			rm_at_shutdown(ups_shutdown, com);
++		}
++		break;
++#endif
+ 	default:
++		status = ENOTTY;
+ 		splx(s);
+-		return (ENOTTY);
++		return (status);
+ 	}
+ 	splx(s);
+ 	return (0);
+@@ -2293,6 +2322,22 @@
+ 		untimeout(comwakeup, (void *)NULL);
+ 	}
+ }
++
++#if COM_UPS > 0
++static void
++ups_shutdown (howto, data)
++	int	howto;
++	void	*data;
++{
++	struct com_s *com = data;
++
++	if (howto & RB_HALT) {
++		if (com->ups_bits) {
++			(void)commctl(com, com->ups_bits, DMBIS);
++		}
++	}
++}
++#endif
+ 
+ static void
+ comwakeup(chan)
+Index: sys/kern/kern_shutdown.c
+===================================================================
+RCS file: /usr/local/libdata/cvs/src/sys/kern/kern_shutdown.c,v
+retrieving revision 1.1.1.1
+retrieving revision 1.1.1.1.2.4
+diff -u -u -r1.1.1.1 -r1.1.1.1.2.4
+--- kern_shutdown.c	1999/05/21 11:40:55	1.1.1.1
++++ kern_shutdown.c	2000/01/13 14:31:58	1.1.1.1.2.4
+@@ -36,7 +36,7 @@
+  * SUCH DAMAGE.
+  *
+  *	@(#)kern_shutdown.c	8.3 (Berkeley) 1/21/94
+- * $Id: diff-FreeBSD-2.2.8,v 1.4 2000/09/27 09:05:03 taca Exp $
++ * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.10.2.3 1999/09/05 08:15:03 peter Exp $
+  */
+ 
+ #include "opt_ddb.h"
+@@ -85,7 +85,6 @@
+ 	&debugger_on_panic, 0, "");
+ #endif
+ 
+-
+ #ifdef	HW_WDOG
+ /*
+  * If there is a hardware watchdog, point this at the function needed to
+@@ -112,16 +111,20 @@
+ 	void *arg;
+ } *sle_p;
+ 
++
+ /*
+  * there are two shutdown lists. Some things need to be shut down
+  * Earlier than others.
+  */
+ static sle_p shutdown_list1;
+ static sle_p shutdown_list2;
++static sle_p shutdown_list3;
++static sle_p shutdown_list4;
+ 
+-
+ static void dumpsys(void);
+ 
++static int count_at_shutdown __P((bootlist_fn function, sle_p *epp, void *arg));
++
+ #ifndef _SYS_SYSPROTO_H_
+ struct reboot_args {
+ 	int	opt;
+@@ -249,6 +252,18 @@
+ 	}
+ 	splhigh();
+ 	if (howto & RB_HALT) {
++		ep = shutdown_list3;
++		while (ep) {
++			shutdown_list3 = ep->next;
++			(*ep->function)(howto, ep->arg);
++			ep = ep->next;
++		}
++		ep = shutdown_list4;
++		while (ep) {
++			shutdown_list4 = ep->next;
++			(*ep->function)(howto, ep->arg);
++			ep = ep->next;
++		}
+ 		printf("\n");
+ 		printf("The operating system has halted.\n");
+ 		printf("Please press any key to reboot.\n\n");
+@@ -421,6 +436,12 @@
+ 	case SHUTDOWN_POST_SYNC:
+ 		epp = &shutdown_list2;
+ 		break;
++	case SHUTDOWN_PRE_HALT:
++		epp = &shutdown_list3;
++		break;
++	case SHUTDOWN_HALT:
++		epp = &shutdown_list4;
++		break;
+ 	default:
+ 		printf("bad exit callout list specified\n");
+ 		return (EINVAL);
+@@ -444,23 +465,24 @@
+ int
+ rm_at_shutdown(bootlist_fn function, void *arg)
+ {
+-	sle_p *epp, ep;
+ 	int count;
+ 
+ 	count = 0;
+-	epp = &shutdown_list1;
+-	ep = *epp;
+-	while (ep) {
+-		if ((ep->function == function) && (ep->arg == arg)) {
+-			*epp = ep->next;
+-			free(ep, M_TEMP);
+-			count++;
+-		} else {
+-			epp = &ep->next;
+-		}
+-		ep = *epp;
+-	}
+-	epp = &shutdown_list2;
++	count += count_at_shutdown(function, &shutdown_list1, arg);
++	count += count_at_shutdown(function, &shutdown_list2, arg);
++	count += count_at_shutdown(function, &shutdown_list3, arg);
++	count += count_at_shutdown(function, &shutdown_list4, arg);
++	return (count);
++}
++
++static int
++count_at_shutdown(function, epp, arg)
++	bootlist_fn	function;
++	sle_p		*epp;
++	void		*arg;
++{
++	sle_p ep;
++	int count = 0;
+ 	ep = *epp;
+ 	while (ep) {
+ 		if ((ep->function == function) && (ep->arg == arg)) {
+@@ -472,6 +494,5 @@
+ 		}
+ 		ep = *epp;
+ 	}
+-	return (count);
++	return count;
+ }
+-
+Index: sys/sys/com_ups.h
+===================================================================
+RCS file: com_ups.h
+diff -N com_ups.h
+--- /dev/null	Mon Jan 31 23:23:29 2000
++++ /tmp/cvsVk9528	Tue Feb  1 20:13:54 2000
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (C) 1999 by JEPRO Co., Ltd.
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR(S) ``AS IS'' AND ANY
++ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR(S) BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
++ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
++ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
++ * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
++ * DAMAGE.
++ *
++ * $Id: diff-FreeBSD-2.2.8,v 1.4 2000/09/27 09:05:03 taca Exp $
++ */
++
++#ifndef	_COM_UPS_H_
++#define	_COM_UPS_H_
++
++#ifndef KERNEL
++#include <sys/types.h>
++#endif
++#include <sys/ioccom.h>
++
++#define UPSIOC_GET	_IOR('u', 1, int)	/* get ups */
++#define UPSIOC_SET	_IOW('u', 2, int)	/* set ups */
++
++#endif /* !_COM_UPS_H_ */
+Index: sys/sys/systm.h
+===================================================================
+RCS file: /usr/local/libdata/cvs/src/sys/sys/systm.h,v
+retrieving revision 1.1.1.1
+retrieving revision 1.1.1.1.2.3
+diff -u -u -r1.1.1.1 -r1.1.1.1.2.3
+--- systm.h	1999/05/21 11:41:14	1.1.1.1
++++ systm.h	1999/11/17 12:02:31	1.1.1.1.2.3
+@@ -36,7 +36,7 @@
+  * SUCH DAMAGE.
+  *
+  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
+- * $Id: diff-FreeBSD-2.2.8,v 1.4 2000/09/27 09:05:03 taca Exp $
++ * $FreeBSD: src/sys/sys/systm.h,v 1.47.2.4 1999/09/05 08:23:02 peter Exp $
+  */
+ 
+ #ifndef _SYS_SYSTM_H_
+@@ -173,6 +173,8 @@
+ int rm_at_shutdown(bootlist_fn function, void *arg);
+ #define SHUTDOWN_PRE_SYNC 0
+ #define SHUTDOWN_POST_SYNC 1
++#define SHUTDOWN_PRE_HALT 2
++#define SHUTDOWN_HALT 3
+ 
+ /* forking */ /* XXX not yet */
+ typedef void (*forklist_fn)(struct proc *parent,struct proc *child,int flags);

@@ -1,0 +1,192 @@
+$Id: diff-FreeBSD-3.4,v 1.1 2002/12/21 17:31:47 taca Exp $
+Index: sys/i386/conf/options.i386
+===================================================================
+--- options.i386.orig	Wed Nov 17 03:26:31 1999
++++ options.i386	Wed Mar  8 20:40:55 2000
+@@ -29,6 +29,7 @@
+ COM_ESP			opt_sio.h
+ COM_MULTIPORT		opt_sio.h
+ EXTRA_SIO		opt_sio.h
++COM_UPS			opt_sio.h
+ I586_PMC_GUPROF		opt_i586_guprof.h
+ WLCACHE			opt_wavelan.h
+ WLDEBUG			opt_wavelan.h
+
+Index: sys/i386/isa/sio.c
+===================================================================
+--- sio.c.orig	Tue Oct 12 00:07:18 1999
++++ sio.c	Wed Mar  8 20:49:13 2000
+@@ -42,6 +42,10 @@
+ #include "sio.h"
+ #include "pnp.h"
+ 
++#ifdef COM_UPS
++#include <sys/com_ups.h>
++#endif
++
+ /*
+  * Serial driver, based on 386BSD-0.1 com driver.
+  * Mostly rewritten to use pseudo-DMA.
+@@ -306,6 +310,9 @@
+ 	void	*devfs_token_cual;
+ 	void	*devfs_token_cuai;
+ #endif
++#ifdef COM_UPS
++	int	ups_bits;
++#endif
+ };
+ 
+ #ifdef COM_ESP
+@@ -400,6 +407,10 @@
+ static	Port_t	likely_esp_ports[] = { 0x140, 0x180, 0x280, 0 };
+ #endif
+ 
++#ifdef COM_UPS
++static void ups_shutdown __P((int howto, void *data));
++#endif
++
+ /*
+  * handle sysctl read/write requests for console speed
+  * 
+@@ -1845,6 +1856,22 @@
+ 		com->do_dcd_timestamp = TRUE;
+ 		*(struct timeval *)data = com->dcd_timestamp;
+ 		break;
++#ifdef COM_UPS
++	case UPSIOC_GET:
++		*(int *)data = com->ups_bits;
++		break;
++	case UPSIOC_SET:
++		error = suser(p->p_ucred, &p->p_acflag);
++		if (error != 0)
++			return (error);
++		com->ups_bits = *(int *)data;
++	if (com->ups_bits) {
++		error = at_shutdown(ups_shutdown, com, SHUTDOWN_HALT);
++	} else {
++		rm_at_shutdown(ups_shutdown, com);
++	}
++	break;
++#endif
+ 	default:
+ 		splx(s);
+ 		error = pps_ioctl(cmd, data, &com->pps);
+@@ -2411,6 +2438,22 @@
+ 		untimeout(comwakeup, (void *)NULL, sio_timeout_handle);
+ 	}
+ }
++
++#ifdef COM_UPS
++static void
++ups_shutdown (howto, data)
++	int howto;
++	void    *data;
++{
++	struct com_s *com = data;
++
++	if (howto & RB_HALT) {
++		if (com->ups_bits) {
++			(void)commctl(com, com->ups_bits, DMBIS);
++		}
++	}
++}
++#endif
+ 
+ static void
+ comwakeup(chan)
+
+Index: sys/kern/kern_shutdown.c
+===================================================================
+--- kern_shutdown.c.orig	Mon Aug 30 01:26:02 1999
++++ kern_shutdown.c	Wed Mar  8 20:52:57 2000
+@@ -292,6 +292,10 @@
+ 		(*ep->function)(howto, ep->arg);
+ 
+ 	if (howto & RB_HALT) {
++		LIST_FOREACH(ep, &shutdown_lists[SHUTDOWN_PRE_HALT], links)
++			(*ep->function)(howto, ep->arg);
++		LIST_FOREACH(ep, &shutdown_lists[SHUTDOWN_HALT], links)
++			(*ep->function)(howto, ep->arg);
+ 		printf("\n");
+ 		printf("The operating system has halted.\n");
+ 		printf("Please press any key to reboot.\n\n");
+@@ -473,7 +477,7 @@
+ 	sle_p ep, ip;
+ 
+ 	if (queue < SHUTDOWN_PRE_SYNC
+-	 || queue > SHUTDOWN_FINAL) {
++	 || queue > SHUTDOWN_HALT) {
+ 		printf("at_shutdown: bad exit callout queue %d specified\n",
+ 		       queue);
+ 		return (EINVAL);
+@@ -517,7 +521,7 @@
+ 	int   queue;
+ 
+ 	count = 0;
+-	for (queue = SHUTDOWN_PRE_SYNC; queue < SHUTDOWN_FINAL; queue++) {
++	for (queue = SHUTDOWN_PRE_SYNC; queue < SHUTDOWN_HALT; queue++) {
+ 		LIST_FOREACH(ep, &shutdown_lists[queue], links) {
+ 			if ((ep->function == function) && (ep->arg == arg)) {
+ 				LIST_REMOVE(ep, links);
+
+Index: sys/sys/com_ups.h
+===================================================================
+--- /dev/null	Sun Dec 22 01:14:44 2002
++++ com_ups.h	Sun Dec 22 01:23:58 2002
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (C) 1999 by JEPRO Co., Ltd.
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR(S) ``AS IS'' AND ANY
++ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR(S) BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
++ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
++ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
++ * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
++ * DAMAGE.
++ *
++ * $Id: diff-FreeBSD-3.4,v 1.1 2002/12/21 17:31:47 taca Exp $
++ */
++
++#ifndef	_COM_UPS_H_
++#define	_COM_UPS_H_
++
++#ifndef KERNEL
++#include <sys/types.h>
++#endif
++#include <sys/ioccom.h>
++
++#define UPSIOC_GET	_IOR('u', 1, int)	/* get ups */
++#define UPSIOC_SET	_IOW('u', 2, int)	/* set ups */
++
++#endif /* !_COM_UPS_H_ */
+
+Index: sys/sys/systm.h
+===================================================================
+--- systm.h.orig	Tue Dec  7 06:03:31 1999
++++ systm.h	Wed Mar  8 20:56:12 2000
+@@ -281,6 +281,8 @@
+ #define	SHUTDOWN_PRE_SYNC	0
+ #define	SHUTDOWN_POST_SYNC	1
+ #define	SHUTDOWN_FINAL		2
++#define	SHUTDOWN_PRE_HALT	3
++#define	SHUTDOWN_HALT		4
+ #define	SHUTDOWN_PRI_FIRST	0
+ #define	SHUTDOWN_PRI_DEFAULT	10000
+ #define	SHUTDOWN_PRI_LAST	20000
+

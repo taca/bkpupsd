@@ -1,0 +1,11 @@
+etc/rc.d/bkpupsd.sh.sample
+etc/upstab
+man/man5/upstab.5.gz
+man/man8/bkpupsd.8.gz
+sbin/bkpupsd
+@mode 700
+libexec/bkpupsd/battery.shutdown
+libexec/bkpupsd/line.lost
+libexec/bkpupsd/line.recover
+libexec/bkpupsd/line.shutdown
+@dirrm libexec/bkpupsd

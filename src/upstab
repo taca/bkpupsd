@@ -1,0 +1,96 @@
+#
+# $Id: upstab,v 1.11 2006/08/22 04:37:41 taca Exp $
+#
+# Copyright (C) 2003, 2004, 2005, 2006 Takahiro Kambe
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+# 3. Neither the name of the author nor the names of its contributors
+#    may be used to endorse or promote products derived from this software
+#    without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+
+#
+# UPS table: describe each UPS.
+#
+#	Capabilities are defined as bellow:
+#
+#	noaction	monitoring serial port only.
+#	init		Set modem bits for the UPS initialization.
+#	status		Set modem bits before getting the UPS's status.
+#	line		Get modem bits for checking line power lost.
+#	low		Get modem bits for checking low battery.
+#	sleep		Set modem bits for sleeing the UPS.
+#	startup		Get modem bits for checking UPS is ready.
+#	timeout		Don't wait for battery low.
+#	kernel		Try to use kernel support for the UPS.
+#	shutdown	argument for shutdown(8).
+#
+#	Each modem bit is represented as bellow and preceding `+' and `-'
+#	means the bit is set and reset respectively.
+#
+#	DTR		Data Terminal Ready (ER)
+#	RTS		Request to Send (RS)
+#	CTS		Clear to Send (CS)
+#	CAR		Carrier Detect (CD)
+#	RNG		Ring Indicator (CI or RI)
+#	DSR		Data Set Ready (DR)
+#
+default:\
+	:shutdown=shutdown -h now:
+
+# null UPS is dummy entry for monitoring status of the serial port.
+null|null UPS, monitor only:\
+	:noaction:
+
+# BK Pro seriese with 940-0095A cable
+bkpro|BK Pro with 940-0095A:\
+	:init=-RTS,+DTR:status=-RTS,-DTR,+DTR:line=+RNG:low=+CAR:\
+	:sleep=-DTR,+DTR,-RTS:tc=default:
+
+# BK Pro seriese with 940-0095B cable, this cable report low battery
+# immideatly.  So, always use timeout parameter.
+bkpro-b|BK Pro with 940-0095B:\
+	:init=-RTS,+DTR:status=-RTS,-DTR,+DTR:line=+RNG:\
+	:sleep=-DTR,+DTR,-RTS:timeout:tc=default:
+
+# BK seriese with 940-0020B cable.  Don't have time margin after ups sleep.
+bk|BK with 940-0020B:\
+	:init=-DTR:line=+CTS:low=+CAR:sleep=+DTR:kernel:tc=default:
+
+# Mitsubishi Electric Corp FREQUPS F seriese.
+freqf|FREQUPS F seriese:\
+	:init=-DTR,+RTS:startup=+CTS,+CAR:line=-CTS:low=-CAR:sleep=+DTR:\
+	:tc=default:
+
+# Mitsubishi Electric Corp FREQUPS A seriese
+freqa|FREQUPS A seriese with dip switch 1 off:\
+	:init=-DTR,+RTS:startup=+CAR:line=-CTS:low=-CAR:\
+	:sleep=+DTR:kernel:tc=default:
+
+# Mitsubishi Electric Corp FREQUPS P seriese, not tested.
+freqp|FREQUPS P seriese:\
+	:init=-RTS,-DTR,+RTS:line=+CTS:low=+CAR:kernel:tc=default:
+
+# OMRON BX75XS, not tested.
+omron-bx75xs|OMRON BX75XS:\
+	:init=-RTS,-DTR,+RTS:line=+CTS:low=+CAR:tc=default:

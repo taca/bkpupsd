@@ -1,0 +1,156 @@
+2006-09-29  Takahiro Kambe  <taca@SmartField.co.jp>
+
+	* bump version, 2.2.1.
+
+	* correct timing of pid file creation again.
+
+2006-08-22  Takahiro Kambe  <taca@back-street.net>
+
+	* bump version, 2.2.0.
+
+	* Fix kernel patch for NetBSD.
+
+	* Change timing of pid file creation.
+
+	* Stop using uu_lock().
+
+	* Add FREQUPS A seriese entry.
+
+2003-03-12  Takahiro Kambe  <taca@back-street.net>
+
+	* bump version, 2.1.2.
+
+	* improve startup script for NetBSD.
+
+2003-01-21  Takahiro Kambe  <taca@back-street.net>
+
+	* bump version, now 2.1.1a.
+
+	* create "waiting indication file."
+
+2002-12-22  Takahiro Kambe  <taca@back-street.net>
+
+	* bump version, now 2.1.1.
+
+	* Update copyright notice.
+
+	* Update my mail address.
+
+	* Fix LP64 problem from NetBSD pkgsrc.
+
+	* Add kernel patch for NetBSD 1.6_STABLE, it should be OK on
+	  NetBSD 1.6 release.
+
+	* Fix compile problem on FreeBSD 4.5 Release reported from
+	  Naoki IDO <ido@hitachi-ms.co.jp>.
+
+	* Add kernel patch for FreeBSD 4.4 based on mail from
+	  Yasuhiro Abe <abe@dzn.co.jp>.
+
+	* Convert shell script patching FreeBSD 3.4 into normal patch file.
+
+Fri Jun 15 16:27:52 2001  Takahiro Kambe  <taca@kyoto.jepro.co.jp>
+
+	* Add files for NEWLAYOUT style FreeBSD ports contributed by
+	  yrsh2scp@mbox.nc.kyushu-u.ac.jp (Yoshifumi R. Shimizu).
+
+	* remove package support for NetBSD since bkpupsd is now included
+	  in NetBSD package collection.
+
+Mon Mar  5 15:00:03 2001  Takahiro Kambe  <taca@kyoto.jepro.co.jp>
+
+	* bump version, now 2.1.
+
+	* now parameter for shutdown(8) may be specified in upstab.
+	  Inspired by proposal from yrsh2scp@mbox.nc.kyushu-u.ac.jp
+	  (Yoshifumi R. Shimizu).
+
+	* correct spelling mistake noted from
+	  yrsh2scp@mbox.nc.kyushu-u.ac.jp (Yoshifumi R. Shimizu)
+
+Fri Nov 17 15:04:43 2000  Takahiro Kambe  <taca@kyoto.jepro.co.jp>
+
+	* 2.0 patchlevel 3 release.
+
+	* Miscellaneous change for lint(1) happy a little.
+
+	* specify file creation mode to open(2) when creating pid file.
+
+Mon Oct 16 18:04:03 2000  Takahiro Kambe  <taca@kyoto.jepro.co.jp>
+
+	* 2.0 patchlevel 2 release.
+
+	* one more tune when creating pid file.
+
+	* make startup script compatible with NetBSD 1.5.
+
+Sat Oct 14 12:30:10 2000  Takahiro Kambe  <taca@kyoto.jepro.co.jp>
+
+	* make pid file earlier.
+
+	* show ups name in argument; add ups name to setproctitle(3).
+
+Tue Oct 10 10:41:56 2000  Takahiro Kambe  <taca@kyoto.jepro.co.jp>
+
+	* 2.0 patchlevel 1 release.
+
+	* startup script, bkpupsd.sh dosen't use specified serial device.
+
+Thu Oct  5 14:22:47 2000  Takahiro Kambe  <taca@kyoto.jepro.co.jp>
+
+	* 2.0 release.
+
+	* add README.jp.
+
+	* correct printf format string in src/main.c, dosen't related to
+	  recent security problem.
+
+	* Clean up some pkg related files.
+
+Wed Aug 30 15:19:59 2000  Takahiro Kambe  <taca@kyoto.jepro.co.jp>
+
+	* Change some command line options imcompatible from 1.4.2.
+
+	* Change hard code UPS's attribute but store in upstab file.
+
+Tue Feb  1 10:26:20 2000  Takahiro Kambe  <taca@kyoto.jepro.co.jp>
+
+	* 1.4.2 release.
+
+	* now pkg directory is optional.
+
+	* fix for NetBSD.
+
+Fri Jan 28 14:35:44 2000  Takahiro Kambe  <taca@kyoto.jepro.co.jp>
+
+	* Manual page has up to date.
+
+	* select(2) is only used for sleeping, since bkpupsd never
+	  send/receive data to/from UPS.  Using sleep(3) needs much more
+	  system calls, so it has avoided.
+
+	* Add -u option, which specify UPS type.  -c option is still
+	  exists only for backward compatibily.  (Maybe deleted or changed 
+	  in future release.)
+
+	* Add "Don't Make UPS slept mode" option, -p.
+
+	* Use shutdown(8) for system down instead of bare halt(8).
+
+	* Add support for FREQUPS F seriese (Mitsubishi Electric Corp.)
+
+Sat Dec 25 12:44:18 1999  Takahiro Kambe  <taca@kyoto.jepro.co.jp>
+
+	* Add "-p" option officially, never make ups into sleep mode.
+	  Old experimental "-p" option, reading data from UPS was
+	  completely removed.
+
+	* Fix mis-spelling reported by YAMAMOTO Norihiro
+	  <yama@wide.csg.kyocera.co.jp>.
+
+Mon Dec 13 15:59:56 1999  Takahiro Kambe  <taca@kyoto.jepro.co.jp>
+
+	* Correct spelling mistake in scripts/Makefile.
+
+	* Change directory construction; better package handling.
+

@@ -1,0 +1,142 @@
+.\" $Id: upstab.5.in,v 1.6 2006/08/22 04:37:55 taca Exp $
+.\"
+.\" Copyright (C) 2003, 2004, 2005, 2006 Takahiro Kambe
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\"
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the auhor nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd Aug 22, 2006
+.Dt UPSTAB 5
+.Os
+.Sh NAME
+.Nm upstab
+.Nd UPS capability data base
+.Sh DESCRIPTION
+.Nm
+is a data base describing UPS used for
+.Xr bkpupsd 8 .
+.Nm
+based on 
+.Xr termcap 5
+style format, consist of a number of `:'-separated fields.
+The first entry for each UPS gives the names that are known for the
+UPS, separated by `|' characters.
+The first name given is the most common abbreviation for the UPS.
+The last name given should be a long name fully identifying the UPS,
+and all others are understood as synonyms for the UPS name.
+All names but the last should be in lower case and contain no blanks;
+the last name may well contain upper case characters and blanks for
+readability.
+.Sh CAPABILITIES
+The characters in the
+.Em Notes
+field in the table have the following meanings and
+.Pp
+.Bd -unfilled -offset indent
+s	indicated status is set by program
+r	indicated status is read from UPS
+.Ed
+.Pp
+.Bl -column indent indent indent
+.Sy Name	Type	Note	Description
+.It "init	str	s	Initilize UPS."
+.It "status	str	r	UPS ready status."
+.It "line	str	r	line lost status."
+.It "low	str	r	battery low status."
+.It "sleep	str	s	make UPS in sleep mode."
+.It "noaction	bool		Don't set status for UPS."
+.It "timeout	bool		Use timeout, don't wait for battery low."
+.It "kernel	bool		Use kernel supported serial port control when shutdown."
+.El
+.Pp
+Each string type capabilities represent which modem bits check or set.
+modem bit strings are separated by comma, it is set or reset by its
+order when setting serial port.
+.Pp
+Each modem bit string are preceeded by plus (+) or minus (-) character.
+`+' means the bit will be set or check the bit has set, `-' means
+the bit will be reset or check the bit hasn't set.
+.Pp
+Supported modem bits are represented as following strings.
+.Pp
+.Bl -column indent indent indent
+.Sy Name	Note	Description
+.It "CTS		Clear To Send"
+.It "DSR		Data Set Ready"
+.It "DTR		Data Terminal Ready"
+.It "LE	r	Line Enable"
+.It "RNG		Ring"
+.It "RTS		Request To Send"
+.It "SR	r	Secondary Receive"
+.It "ST	r	Secondary Transmit"
+.El
+.Pp
+If
+.Em Notes
+field in the table has `r', the bit should be used for showing status by
+.Xr bkpupsd 8
+only, and shouldn't be used for
+.Nm upstab .
+.Pp
+.Sh EXAMPLE
+A simple example is here:
+.Bd -literal
+bkpro\||\|BK Pro with 940-0095A:\e
+	:init=-RTS,+DTR:status=-RTS,-DTR,+DTR:line=+RNG:low=+CAR:\e
+	:sleep=-DTR,+DTR,-RTS:
+.Ed
+.Pp
+In this case, reset DTR then set DTR on startup.  Reset RTS, DTR
+then set DTR before get serial port status.  And check the status;
+line power lost if RNG is set, battery is low if CAR is set.
+Reset DTR, set DTR then reset RTS sequence make UPS in sleep mode.
+.Pp
+.Bd -literal
+freqf\||\|FreqUPS F seriese:\e
+	:init=-DTR,-RTS,+RTS:startup=+CTS,+CAR:line=-CTS:low=-CAR:\e
+	:sleep=+DTR:
+.Ed
+.Pp
+In this case, after setting serial port on startup, then wait for
+CTS and CAR are set.
+.Pp
+.Sh FILES
+.Bl -tag -width %%prefix%%/etc/upstab
+.It Pa  %%prefix%%/etc/upstab
+.El
+.Sh SEE ALSO
+.Xr getcap 3
+.Sh BUGS
+Not all of modem bits could be really set to UPS from
+.Xr bkpupsd 8 .
+.Sh AUTHOR
+.Nm
+is written by Takahiro Kambe
+<taca@back-street.net>.
+.Sh HISTORY
+The
+.Nm
+appeared after FreeBSD 2.2.8, and should works on NetBSD 1.4 and later.

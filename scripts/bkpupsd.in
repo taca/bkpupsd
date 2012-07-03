@@ -1,0 +1,22 @@
+#!/bin/sh
+# $Id: bkpupsd.in,v 1.5 2006/08/22 04:16:41 taca Exp $
+#
+
+# PROVIDE: bkpupsd
+# REQUIRE: syslogd
+
+. /etc/rc.subr
+
+name="bkpupsd"
+rcvar=$name
+command="%%prefix%%/sbin/${name}"
+start_precmd="bkpupsd_prestart"
+
+bkpupsd_prestart()
+{
+	command_args="${bkpupsd_options} ${bkpupsd_ups:=null}:${bkpupsd_device:=%%device%%}"
+	return 0
+}
+
+load_rc_config $name
+run_rc_command "$1"

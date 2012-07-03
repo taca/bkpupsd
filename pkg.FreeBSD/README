@@ -1,0 +1,9 @@
+These are some files for making bkpupsd ports.
+
+- 2.2.8 directory contains for old 2.2.8 base.
+- 4.2 directory contains for NEWLAYOUT style, contributed by
+  yrsh2scp@mbox.nc.kyushu-u.ac.jp (Yoshifumi R. Shimizu).
+
+* These files may not work it should be. *
+
+$Id: README,v 1.1 2001/12/19 05:43:45 taca Exp $

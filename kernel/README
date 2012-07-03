@@ -1,0 +1,29 @@
+README for kernel patch
+
+							2006/8/22
+
+This directory contains some kernel patches which make serial port
+into specific status at shutdown the system.  These patches are
+provided ``AS IS'' and no warranties at all.
+
+Before apply the patch, check the each file's content carefully.
+
+diff-FreeBSD-2.2.8			patch for FreeBSD 2.2.8
+diff-FreeBSD-3.4			patch for FreeBSD 3.4
+diff-FreeBSD-4.4			patch for FreeBSD 4.4
+diff-NetBSD-1.6_STABLE-2006.08.20	patch for NetBSD 1.6_STABLE
+diff-NetBSD-3.0_STABLE-2006.08.20	patch for NetBSD 3.0
+
+The patch for FreeBSD 3.4 was based on the mail from
+Naoki IDO <ido@hitachi-ms.co.jp>.
+
+The patch for FreeBSD 4.4 was based on the mail from
+Yasuhiro Abe <abe@dzn.co.jp>
+
+Thanks very much for authors, but I've never verified it.
+
+
+And if you have any trouble or information, let me know by E-Mail,
+taca@back-street.net.  Don't ask a question directly to contributors.
+
+$Id: README,v 1.3 2006/08/22 04:08:53 taca Exp $

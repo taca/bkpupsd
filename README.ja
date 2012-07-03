@@ -1,0 +1,288 @@
+README for bkpupsd 2.2.0
+
+bkpupsd -- simple UPS daemon
+
+					2006/8/22
+					Takahiro Kambe <taca@back-street.net>
+
+1. 概要
+
+bkpupsdはUPSの監視とモニタを行うプログラムです。bkpupsdはFreeBSD 2.2.8
+とNetBSD 1.4以降のために設計されていて、シリアルポートのモデム制御ビッ
+トによってUPS の監視とモニタを行います。bkpupsdは株式会社エーピーシー
+製のBK 350/500と三菱電機株式会社製のFREQUPS A/Fシリーズで動作確認を行い
+ました。
+
+
+2. 責任の放棄
+
+これらのプログラムや提供する情報が適切であることは保障できません。UPSの
+制御はきわどい部分がある作業です。どのような損害が発生しても、*まったく
+責任は取れません*。使用者自信の責任おいて、使用して下さい。
+
+また、bkpupsdはUPSのユーザによって開発されていますので、UPSのベンダーに
+対してbkpupsdに関する質問はしないで下さい。
+
+株式会社エーピーシーのUPSの監視や制御についての情報は、シリアルポートの
+状態を調べる、リバース・エンジニアリングで得ました。
+
+また、以下のapcupsdのWebページも参考にしています。
+
+	http://www.brisse.dk/site/apcupsd/
+
+apcupsdは株式会社エーピーシーのUPSの本当の管理を達成した素晴らしいプログ
+ラムです。いくつかのBSD環境では(portsやpkgといった)パッケージとして利用
+できる様です。
+
+
+3. インターフェイス・ケーブル
+
+UPSとコンピュータのシリアル・ポートを接続するインターフェイス・ケーブル
+は、ベンダーが提供するインターフェイス・キットと互換性がなければなりませ
+ん。
+
+BK Proシリーズでは、940-0095A dual purpose cableと940-0020B simple cable
+で動作します。BKシリーズでは940-0020Bだけが動作します。
+
+BK Proシリーズは940-0095Bというケーブルが付属することがあります。株式会
+社エーピーシーによって提供されるソフトウェアを使用するときは940-0095Aと
+互換性があるとのことですが、940-0095Bはバッテリーの低下を適切に通知して
+くれない様です。そこで、bkpupsdでは"bkpro-b"というUPSタイプを指定しなけ
+ればなりません。
+
+
+三菱電機株式会社製のFREQUPS Fシリーズについては、通常のクロス(リバース)の
+RS232Cケーブルで快適に動作します。(FREQUPS Fモデルにはケーブルが付属して
+います。)
+
+
+4. テストしたUPSのモデル
+
+bkpupsd 2.0は以下のUPSで動作テストを行いました。
+
+	o エーピーシー社製 BK 350J および BK Pro 500
+	o 三菱電機株式会社製 FREQUPS Fシリーズ(FW-F10-0.5K)
+	o 三菱電機株式会社製 FREQUPS Aシリーズ(FW-A10L-1.0K)
+
+これ以外のモデルではまったくテストしていません。
+
+前のバージョン(1.4.2)と異なり、bkpupsd 2.0はUPSのパラメータを、upstabと
+いうUPSの表のファイルから読み込みます。また、オプションのいくつかは1.4.2
+から変更されていますので、マニュアル(またはソース・ファイル)を読んで意図
+されるとおりかどうか確認して下さい。
+
+BKシリーズの様に、UPSによっては安全なシャットダウンを完了するためにカー
+ネルの修正が必要な場合があります。カーネルへのパッチはkernelというディレ
+クトリ以下にありますので、kernel/READMEのファイルを御覧下さい。もし、カー
+ネルを修正しないか、できない場合は、kernel"という能力属性を加えた、新し
+いUPSのエントリをupstabに作成して下さい。
+
+FREQUPS Fシリーズには、UPSの動作を変更できるディップ・スイッチがあります。
+ディップ・スイッチの2番は必ずONにしなければなりませんが、以下にその要約
+を示します。(古いモデルには5番と6番のディップ・スイッチはありません。)
+
+	SW1:	ON	これでUPSのPOWERスイッチでシャットダウンできます。
+	SW2:	ON	必ずONにしなければなりません。
+	SW3:	OFF	デフォルトのOFFのままとしてください。
+	SW4:	ON	これでUPSのリブート機能が有効となります。
+	SW5:	OFF	デフォルトのOFFのままとしてください。
+	SW6:	OFF	デフォルトのOFFのままとしてください。
+
+FREQUPS Aシリーズには、UPSの動作を変更できるディップ・スイッチがあります。
+bkpupsdは「シリアル通信」の動作モードはサポートしていませんので、「ネット
+ワークOS管理」のモードを使用して下さい。ディップ・スイッチの1番はOFFにし
+ます。
+
+	SW1:	OFF	ネットワークOS管理のモードにします。(デフォルト)
+	SW2:	OFF	デフォルトのOFFのままとしてください。
+	SW3:	OFF	デフォルトのOFFのままとしてください。
+	SW4:	OFF	デフォルトのOFFで構いません。(*)
+	SW5:	OFF	これでUPSのPOWERスイッチでシャットダウンできます。
+	SW6:	OFF	デフォルトのOFFで構いません。(*)
+
+	* これらのディップ・スイッチの設定についてはマニュアルを参照して
+	  ください。
+
+これ以上の詳細はUPSのマニュアルを読んで下さい。
+
+この他のRS-232Cのモデム制御信号で制御されるUPSの場合、"null"のUPSタイプ
+を指定してみて下さい。そして、syslogのLOGDEBUGレベルを調べて、AC電源を外
+したり、UPSのバッテリが低下した場合の挙動を見て下さい。UPSの停止方法は
+別に調べる必要がありますが、ログの情報からupstabのエントリを作成してUPSを
+モニタは可能となるでしょう。
+
+
+5. インストール
+
+  1. アーカイブのファイルを展開して下さい。
+
+  2. `Pro'の付かないBKシリーズを使用したい場合、kernelのディレクトリ以下
+     のファイルを使ってパッチを適用してカーネルを変更する必要があります。
+     例えば、FreeBSD 2.2.8では以下の様になります。
+
+	# (cd /usr/src; patch -p) < kernel/diff-FreeBSD-2.2.8
+	# (cd /usr/src; make includes)
+
+     NetBSD 3.0では以下の様になります。
+
+	# (cd /usr/src; patch -p) < kernel/diff-NetBSD-3.0_STABLE-2006.08.20
+	# (cd /usr/src/sys/sys; make includes)
+	# cd /usr/src; sh build.sh -u kernel="YOUR-KERNEL"
+
+   他のバージョンの*BSDシステムでは、カーネルを自分でハックして下さい。:-) 
+
+  3. bkpupsdをコンパイルします。
+
+	# make depend
+	# make
+	# make install
+
+     以下のファイルがインストールされます。
+
+	- bkpupsd	- upsの監視と制御のプログラム
+		/usr/local/sbin/bkpupsd
+
+	- scripts
+		/usr/local/libexec/bkpupsd/
+			battery.shutdown
+			line.lost
+			line.recover
+			line.shutdown
+	- manual
+		/usr/local/man/man8/bkpupsd.8
+
+	- 起動スクリプトの例
+		/usr/local/etc/bkpupsd.sh.sample
+
+
+6. 設定方法
+
+以下が必要なことのまとめとなります。
+
+	1. PCの電源プラグをUPSの出力に接続します。
+	2. PCのシリアルポートをUPSのインターフェイスに接続します。
+	3. UPSの電源プラグを商用電源に接続します。
+	4. bkpupsdの動作確認をします。
+
+システム環境によって、設定方法は異なることがあります。以下は設定の一例で
+す。
+
+  1. サンプルの起動スクリプトを本来の名前にコピーします。
+
+	# cd /usr/local/etc/rc.d
+	# cp bkpupsd.sh.sample bkpupsd.sh
+
+  2. 起動スクリプトを編集します。必要に応じてdeviceを変更し、UPSのタイプ
+     をupsに、その他のオプションをoptionsに設定します。
+
+	device="-f /dev/dty01"
+	ups="freqf"
+	options=""
+
+     これはFREQUPS Fでの例です。940-0095AのケーブルでBK Proシリーズを使
+     う場合は"bkpro"を、940-0020Bのケーブルを使用する場合は"bk"を指定し
+     て下さい。
+
+     UPSの電源プラグを抜いたときに、UPSが即座にバッテリー低下を通知する
+     場合は、upptab(5)に"low"の能力属性を加えた新しいUPSのエントリーを作
+     成し、適切なタイムアウト時間を"-t"オプションと共に指定して下さい。
+
+     bkpupsd(8)のオプションの確認はオンライン・マニュアルを、UPSの能力属
+     性の変更にはupstab(5)を見て下さい。
+
+  3. 起動スクリプトを/etc/rc.localに加えて下さい。(NetBSDの場合)
+
+	# Start up bkpupsd.
+	if [ -x /usr/local/etc/rc.d/bkpupsd.sh ]; then
+		sh /usr/local/etc/rc.d/bkpupsd.sh start
+	fi
+
+  4. システムを停止して下さい。
+  5. PCの電源を停止して下さい。
+  6. PCのシリアルポート1番を、UPSのインターフェース・ポートと接続して下
+     さい。
+  7. PCの電源プラグをUPSの出力に接続して下さい。
+  8. UPSの電源プラグを商用電源に接続して下さい。
+  9. UPSの電源を入れて下さい。
+  10. PCの電源を入れて下さい。
+
+PCとUPSの接続はとてもきわどい処理と言えます。できるだけ設定を何度も確認
+した方が良いでしょう。UPSの電源プラグを抜いたり、挿したりして、PCのディ
+スプレイにウォーニングや回復のメッセージが表示され、稼働を続けることを確
+認して下さい。UPSの電源プラグを抜いたまま、6分から40分放置すると、PCはバッ
+テリーの残量低下によって適切に停止することを確認して下さい。その後、UPS
+は停止状態となって、稼働を示すランプが消灯します。その後、UPSの電源プラ
+グを接続すると、UPSは起動してPCも再び起動します。
+
+
+7. 補足
+
+このプログラムをlinuxや他のSystem V系のオペレーティング・システムに移植
+することは勧められません。bkpupsdはBSDベースのOSに設計されていて、
+System VのSIGPWRシグナルやinitの機能をサポートしていません。linuxには、
+強力なUPS制御のプログラムがいくつかあるでしょう。
+
+apcupsdのWebページからケーブルに関する情報を利用させて頂きました。
+
+本プログラムのバグやセキュリティ・ホールを見つけたら、私に連絡して下さい。
+
+
+8. 謝辞
+
+渡邉 好文さん/mwatts@edu1.tokyo-med.ac.jpに、最初のバージョンのbkpupsdの
+プログラムを作成されたことを感謝します。
+
+三菱電機株式会社様に、FREQUPS F series (FW-F10-0.5K)を長期に渡って、
+FREQUPS A series (FW-A10L-1.0K)をお貸し頂き、有益なアドバイスを頂いた
+ことを特別に感謝します。
+
+井戸 直樹さん/ido@hitachi-ms.co.jpに、FreeBSD 3.4でカーネルの修正を試し
+て頂き、パッチを送って頂いたことを感謝します。
+
+Kazushi (Jam) Marukawaさん/jam@pobox.comに、本日本語版READMEの問題を御連
+絡して頂き、感謝します。
+
+yrsh2scp@mbox.nc.kyushu-u.ac.jp (Yoshifumi R. Shimizu)さんに、シャッ
+トダウンの処理手順の改良に関する提案を頂き、たいへん感謝します。また、
+新しい配置のFreeBSD portsのファイルも頂きました。
+
+桝田 秀夫 <h-masuda@ootani.nagata.kobe.jp>さんに、オムロン社製のUPS、
+BX75XSでの動作情報をいただいたことに感謝します。
+
+株式会社スマートフィールドに、bkpupsdの開発を続ける機会を与えてくれた
+ことに感謝します。
+
+この他、すべてのNetBSDとFreeBSDのコミュニティに感謝します。
+
+
+9. Copyright
+
+Copyright (C) 2003, 2004, 2005, 2006 Takahiro Kambe
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+3. Neither the name of the author nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.
+
+$Id: README.ja,v 1.4 2006/08/22 04:38:46 taca Exp $

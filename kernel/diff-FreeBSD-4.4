@@ -1,0 +1,167 @@
+$Id: diff-FreeBSD-4.4,v 1.1 2002/12/21 17:31:47 taca Exp $
+Index: sys/i386/conf/options.i386
+===================================================================
+--- options.orig	Fri Oct 12 19:00:54 2001
++++ options	Fri Oct 12 19:01:39 2001
+@@ -428,6 +428,7 @@
+ # Various mi ISA bus flags
+ COM_ESP			opt_sio.h
+ COM_MULTIPORT		opt_sio.h
++COM_UPS			opt_sio.h
+ BREAK_TO_DEBUGGER	opt_comconsole.h
+ ALT_BREAK_TO_DEBUGGER	opt_comconsole.h
+
+Index: sys/i386/isa/sio.c
+===================================================================
+--- sio.c.orig	Fri Oct 12 19:07:01 2001
++++ sio.c	Fri Oct 12 20:39:34 2001
+@@ -43,6 +43,10 @@
+ #include "pci.h"
+ #include "sio.h"
+ 
++#ifdef COM_UPS
++#include <sys/com_ups.h>
++#endif
++
+ /*
+  * Serial driver, based on 386BSD-0.1 com driver.
+  * Mostly rewritten to use pseudo-DMA.
+@@ -72,6 +76,10 @@
+ #include <sys/rman.h>
+ #include <sys/timepps.h>
+ 
++#ifdef COM_UPS
++#include <sys/eventhandler.h>
++#endif
++
+ #include <isa/isareg.h>
+ #include <isa/isavar.h>
+ #if NPCI > 0
+@@ -285,6 +293,10 @@
+ 	 */
+ 	u_char	obuf1[256];
+ 	u_char	obuf2[256];
++#ifdef COM_UPS
++	int	ups_bits;
++	eventhandler_tag	ups_eh;
++#endif
+ };
+ 
+ #ifdef COM_ESP
+@@ -448,6 +460,10 @@
+ static	Port_t	likely_esp_ports[] = { 0x140, 0x180, 0x280, 0 };
+ #endif
+ 
++#ifdef COM_UPS
++static void ups_shutdown __P((void *data, int howto));
++#endif
++
+ /*
+  * handle sysctl read/write requests for console speed
+  * 
+@@ -2232,6 +2248,29 @@
+ 		com->do_dcd_timestamp = TRUE;
+ 		*(struct timeval *)data = com->dcd_timestamp;
+ 		break;
++#ifdef COM_UPS
++	case UPSIOC_GET:
++		*(int *)data = com->ups_bits;
++		break;
++	case UPSIOC_SET:
++#ifdef __FreeBSD__
++		error = suser(p);
++#else
++		error = suser(p->p_ucred, &p->p_acflag);
++#endif
++		if (error != 0)
++			return (error);
++		com->ups_bits = *(int *)data;
++		if (com->ups_bits) {
++			com->ups_eh = EVENTHANDLER_REGISTER(shutdown_final, ups_shutdown, com, SHUTDOWN_PRI_LAST + 99);
++		} else {
++			if (com->ups_eh != NULL) {
++				EVENTHANDLER_DEREGISTER(shutdown_final, com->ups_eh);
++				com->ups_eh = NULL;
++			}
++		}
++		break;
++#endif
+ 	default:
+ 		splx(s);
+ 		error = pps_ioctl(cmd, data, &com->pps);
+@@ -2785,6 +2824,30 @@
+ 		untimeout(comwakeup, (void *)NULL, sio_timeout_handle);
+ 	}
+ }
++
++#ifdef COM_UPS
++static void
++ups_shutdown (data, howto)
++	void    *data;
++	int howto;
++{
++	struct com_s *com = data;
++
++	if (howto & RB_HALT) {
++		if (com->ups_bits) {
++			printf("\n");
++			printf("Try to poweroff the UPS...\n");
++			DELAY(3000000);	/* wait 3 sec for printf's to complete and be read */
++
++			(void)commctl(com, com->ups_bits, DMBIS);
++
++			DELAY(10000000);	/* wait 10 sec */
++
++			/* NORMALLY NOTREACHED */			
++		}
++	}
++}
++#endif
+ 
+ static void
+ comwakeup(chan)
+
+Index: sys/sys/com_ups.h
+===================================================================
+/*
+ * Copyright (C) 1999 by JEPRO Co., Ltd.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR(S) ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR(S) BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+ * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+ * DAMAGE.
+ *
+ * $Id: diff-FreeBSD-4.4,v 1.1 2002/12/21 17:31:47 taca Exp $
+ */
+
+#ifndef _COM_UPS_H_
+#define _COM_UPS_H_
+
+#ifndef KERNEL
+#include <sys/types.h>
+#endif
+#include <sys/ioccom.h>
+
+#define UPSIOC_GET      _IOR('u', 1, int)       /* get ups */
+#define UPSIOC_SET      _IOW('u', 2, int)       /* set ups */
+
+#endif /* !_COM_UPS_H_ */
+

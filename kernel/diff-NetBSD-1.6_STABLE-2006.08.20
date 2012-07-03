@@ -1,0 +1,346 @@
+Index: arch/i386/i386/machdep.c
+===================================================================
+RCS file: /usr/pkg/libdata/cvs/netbsd/sys/arch/i386/i386/machdep.c,v
+retrieving revision 1.1.1.25
+retrieving revision 1.1.1.7.2.8
+diff -u -d -u -p -r1.1.1.25 -r1.1.1.7.2.8
+--- arch/i386/i386/machdep.c	2002/12/17 02:43:16	1.1.1.25
++++ arch/i386/i386/machdep.c	2002/12/17 07:42:36	1.1.1.7.2.8
+@@ -2238,6 +2238,9 @@ cpu_reboot(howto, bootstr)
+ haltsys:
+ 	doshutdownhooks();
+ 
++	if ((howto & RB_HALT) == RB_HALT)
++		printf("\n\nYou can power off now.\n");
++
+ 	if ((howto & RB_POWERDOWN) == RB_POWERDOWN) {
+ #if NAPM > 0 && !defined(APM_NO_POWEROFF)
+ 		/* turn off, if we can.  But try to turn disk off and
+Index: conf/files
+===================================================================
+RCS file: /usr/pkg/libdata/cvs/netbsd/sys/conf/files,v
+retrieving revision 1.1.1.30
+retrieving revision 1.1.1.7.2.15
+diff -u -d -u -p -r1.1.1.30 -r1.1.1.7.2.15
+--- conf/files	2002/12/17 02:52:28	1.1.1.30
++++ conf/files	2002/12/17 07:42:58	1.1.1.7.2.15
+@@ -575,7 +576,7 @@ file	dev/ic/ne2000.c			ne | IPKDB_NE
+ # 8250/16[45]50-based "com" ports
+ # XXX In a perfect world, this would be done with attributes
+ #
+-defflag	opt_com.h		COM16650 COM_HAYESP COM_DEBUG COM_MPLOCK
++defflag	opt_com.h		COM16650 COM_HAYESP COM_DEBUG COM_MPLOCK COM_UPS
+ device	com { } : tty
+ file	dev/ic/com.c			com			needs-flag
+ 
+Index: dev/ic/com.c
+===================================================================
+RCS file: /usr/pkg/libdata/cvs/netbsd/sys/dev/ic/com.c,v
+retrieving revision 1.1.1.4
+diff -d -u -p -r1.1.1.4 com.c
+--- dev/ic/com.c	7 Apr 2004 09:54:18 -0000	1.1.1.4
++++ dev/ic/com.c	21 Aug 2006 06:25:01 -0000
+@@ -128,6 +128,10 @@ __KERNEL_RCSID(0, "$NetBSD: com.c,v 1.19
+ #include <dev/ic/hayespreg.h>
+ #endif
+ #define	com_lcr	com_cfcr
++#ifdef COM_UPS
++#include <sys/reboot.h>
++#include <sys/com_ups.h>
++#endif
+ #include <dev/cons.h>
+ 
+ #ifdef COM_HAYESP
+@@ -138,6 +142,12 @@ static void com_enable_debugport __P((st
+ 
+ void	com_config	__P((struct com_softc *));
+ void	com_shutdown	__P((struct com_softc *));
++#ifdef COM_UPS
++static void com_ups_shutdown __P((void *));
++
++static int com_ups_debug = 0;
++static int com_ups_sleep = 30000000; /* 30 sec */
++#endif
+ int	comspeed	__P((long, long));
+ static	u_char	cflag2lcr __P((tcflag_t));
+ int	comparam	__P((struct tty *, struct termios *));
+@@ -521,6 +531,9 @@ com_attach_subr(sc)
+ 		sc->sc_fifolen = 1;
+ 		printf("%s: txfifo disabled\n", sc->sc_dev.dv_xname);
+ 	}
++#ifdef COM_UPS
++	printf("%s: with ups support\n", sc->sc_dev.dv_xname);
++#endif
+ #ifdef COM_HAYESP
+ 	}
+ #endif
+@@ -541,6 +554,11 @@ com_attach_subr(sc)
+ 	}
+ 	sc->sc_ebuf = sc->sc_rbuf + (com_rbuf_size << 1);
+ 
++#ifdef COM_UPS
++	sc->ups_bits = 0;
++	sc->ups_hook = NULL;
++#endif
++
+ 	tty_attach(tp);
+ 
+ 	if (!ISSET(sc->sc_hwflags, COM_HW_NOIEN))
+@@ -743,6 +761,12 @@ com_shutdown(sc)
+ 	sc->sc_ppsmask = 0;
+ 	sc->ppsparam.mode = 0;
+ 
++#ifdef COM_UPS
++	if (sc->ups_hook) {
++		splx(s);
++		return;
++	}
++#endif
+ 	/*
+ 	 * Hang up if necessary.  Wait a bit, so the other side has time to
+ 	 * notice even if we immediately open the port again.
+@@ -777,6 +801,25 @@ com_shutdown(sc)
+ 	splx(s);
+ }
+ 
++
++#ifdef COM_UPS
++static void
++com_ups_shutdown(data)
++	void *data;
++{
++	struct com_softc *sc = data;
++
++	if (sc->ups_hook && (boothowto & RB_HALT) == RB_HALT) {
++		printf("%s: shutting down ups ... ", sc->sc_dev.dv_xname);
++		tiocm_to_com(sc, TIOCMSET, sc->ups_bits);
++		delay(com_ups_sleep);
++		printf("Done.\n");
++	}
++	sc->ups_hook = NULL;
++	com_shutdown(sc);
++}
++#endif
++
+ int
+ comopen(dev, flag, mode, p)
+ 	dev_t dev;
+@@ -1180,6 +1223,22 @@ comioctl(dev, cmd, data, flag, p)
+ #endif
+ 		break;
+ 
++#ifdef COM_UPS
++	case UPSIOC_GET:
++		*(int *)data = sc->ups_bits;
++		break;
++	case UPSIOC_SET:
++		error = suser(p->p_ucred, &p->p_acflag); 
++		if (error)
++			break;
++		sc->ups_bits = *(int *)data;
++		if (sc->ups_bits)
++			sc->ups_hook = shutdownhook_last_establish(com_ups_shutdown, sc);
++		else
++			shutdownhook_disestablish(sc->ups_hook);
++		break;
++#endif
++
+ 	default:
+ 		error = EPASSTHROUGH;
+ 		break;
+@@ -1270,6 +1329,11 @@ tiocm_to_com(sc, how, ttybits)
+ 	int ttybits;
+ {
+ 	u_char combits;
++#ifdef COM_UPS
++	u_char mcr;
++
++	mcr = sc->sc_mcr;
++#endif
+ 
+ 	combits = 0;
+ 	if (ISSET(ttybits, TIOCM_DTR))
+@@ -1292,6 +1356,11 @@ tiocm_to_com(sc, how, ttybits)
+ 		break;
+ 	}
+ 
++#ifdef COM_UPS
++	if (com_ups_debug)
++		printf("%s: set mcr %03o: %03o => %03o\n",
++		       sc->sc_dev.dv_xname, ttybits, mcr, sc->sc_mcr);
++#endif
+ 	if (!sc->sc_heldchange) {
+ 		if (sc->sc_tx_busy) {
+ 			sc->sc_heldtbc = sc->sc_tbc;
+@@ -1605,6 +1674,10 @@ com_loadchannelregs(sc)
+ 	bus_space_write_1(iot, ioh, com_dlbl, sc->sc_dlbl);
+ 	bus_space_write_1(iot, ioh, com_dlbh, sc->sc_dlbh);
+ 	bus_space_write_1(iot, ioh, com_lcr, sc->sc_lcr);
++#ifdef COM_UPS
++	if (com_ups_debug)
++		printf("%s: mcr => %03o\n", sc->sc_dev.dv_xname, sc->sc_mcr);
++#endif
+ 	bus_space_write_1(iot, ioh, com_mcr, sc->sc_mcr_active = sc->sc_mcr);
+ 	bus_space_write_1(iot, ioh, com_fifo, sc->sc_fifo);
+ #ifdef COM_HAYESP
+Index: dev/ic/comvar.h
+===================================================================
+RCS file: /usr/pkg/libdata/cvs/netbsd/sys/dev/ic/comvar.h,v
+retrieving revision 1.1.1.15
+retrieving revision 1.1.1.2.2.2
+diff -u -d -u -p -r1.1.1.15 -r1.1.1.2.2.2
+--- dev/ic/comvar.h	2002/11/06 03:08:41	1.1.1.15
++++ dev/ic/comvar.h	2002/06/03 02:58:16	1.1.1.2.2.2
+@@ -141,6 +141,10 @@ struct com_softc {
+ #if (defined(MULTIPROCESSOR) || defined(LOCKDEBUG)) && defined(COM_MPLOCK)
+ 	struct simplelock	sc_lock;
+ #endif
++#ifdef COM_UPS
++	int	ups_bits;
++	void	*ups_hook;
++#endif
+ };
+ 
+ /* Macros to clear/set/test flags. */
+Index: kern/kern_subr.c
+===================================================================
+RCS file: /usr/pkg/libdata/cvs/netbsd/sys/kern/kern_subr.c,v
+retrieving revision 1.1.1.21
+retrieving revision 1.1.1.5.2.6
+diff -u -d -u -p -r1.1.1.21 -r1.1.1.5.2.6
+--- kern/kern_subr.c	2002/11/25 09:00:16	1.1.1.21
++++ kern/kern_subr.c	2002/11/25 11:27:37	1.1.1.5.2.6
+@@ -130,6 +130,7 @@ struct hook_desc {
+ typedef LIST_HEAD(, hook_desc) hook_list_t;
+ 
+ static void *hook_establish __P((hook_list_t *, void (*)(void *), void *));
++static void *hook_last_establish __P((hook_list_t *, void (*) __P((void *)), void *));
+ static void hook_disestablish __P((hook_list_t *, void *));
+ static void hook_destroy __P((hook_list_t *));
+ static void hook_proc_run __P((hook_list_t *, struct proc *));
+@@ -395,6 +396,28 @@ hook_establish(list, fn, arg)
+ 	return (hd);
+ }
+ 
++static void *
++hook_last_establish(list, fn, arg)
++	hook_list_t *list;
++	void (*fn) __P((void *));
++	void *arg;
++{
++	struct hook_desc *hd, *p, *n;
++
++	hd = malloc(sizeof(*hd), M_DEVBUF, M_NOWAIT);
++	if (hd == NULL)
++		return (NULL);
++
++	hd->hk_fn = fn;
++	hd->hk_arg = arg;
++	p = LIST_FIRST(list);
++	while ((n = LIST_NEXT(p, hk_list)) != NULL)
++		p = n;
++	LIST_INSERT_AFTER(p, hd, hk_list);
++
++	return (hd);
++}
++
+ static void
+ hook_disestablish(list, vhook)
+ 	hook_list_t *list;
+@@ -458,6 +481,15 @@ shutdownhook_establish(fn, arg)
+ {
+ 	return hook_establish(&shutdownhook_list, fn, arg);
+ }
++
++void *
++shutdownhook_last_establish(fn, arg)
++	void (*fn) __P((void *));
++	void *arg;
++{
++	return hook_last_establish(&shutdownhook_list, fn, arg);
++}
++
+ 
+ void
+ shutdownhook_disestablish(vhook)
+Index: sys/Makefile
+===================================================================
+RCS file: /usr/pkg/libdata/cvs/netbsd/sys/sys/Makefile,v
+retrieving revision 1.1.1.15
+retrieving revision 1.1.1.2.2.2
+diff -u -d -u -p -r1.1.1.15 -r1.1.1.2.2.2
+--- sys/Makefile	2002/11/06 03:13:05	1.1.1.15
++++ sys/Makefile	2002/06/03 04:32:35	1.1.1.2.2.2
+@@ -23,7 +23,7 @@ INCS=	acct.h agpio.h ansi.h ataio.h audi
+ 	systm.h tablet.h termios.h time.h timeb.h timepps.h times.h timex.h \
+ 	tprintf.h trace.h tty.h ttychars.h ttycom.h ttydefaults.h ttydev.h \
+ 	types.h ucred.h uio.h un.h unistd.h unpcb.h user.h utsname.h \
+-	vadvise.h vmmeter.h vnode.h vnode_if.h wait.h wdog.h
++	vadvise.h vmmeter.h vnode.h vnode_if.h wait.h wdog.h com_ups.h
+ 
+ SYMLINKS= sys/exec_elf.h /usr/include/elf.h \
+ 	sys/fcntl.h /usr/include/fcntl.h \
+Index: sys/com_ups.h
+===================================================================
+RCS file: com_ups.h
+diff -N com_ups.h
+--- /dev/null	Sun Dec 22 01:19:45 2002
++++ /tmp/cvs17703jf	Sun Dec 22 01:45:34 2002
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (C) 2003, 2004, 2005, 2006 Takahiro Kambe
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR(S) ``AS IS'' AND ANY
++ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR(S) BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
++ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
++ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
++ * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
++ * DAMAGE.
++ *
++ * $Id: diff-NetBSD-1.6_STABLE-2006.08.20,v 1.1 2006/08/22 04:08:59 taca Exp $
++ */
++
++#ifndef	_COM_UPS_H_
++#define	_COM_UPS_H_
++
++#ifndef KERNEL
++#include <sys/types.h>
++#endif
++#include <sys/ioccom.h>
++
++#define UPSIOC_GET	_IOR('u', 1, int)	/* get ups */
++#define UPSIOC_SET	_IOW('u', 2, int)	/* set ups */
++
++#endif /* !_COM_UPS_H_ */
+Index: sys/systm.h
+===================================================================
+RCS file: /usr/pkg/libdata/cvs/netbsd/sys/sys/systm.h,v
+retrieving revision 1.1.1.20
+retrieving revision 1.1.1.4.2.5
+diff -u -d -u -p -r1.1.1.20 -r1.1.1.4.2.5
+--- sys/systm.h	2002/11/25 09:01:31	1.1.1.20
++++ sys/systm.h	2002/11/25 11:27:53	1.1.1.4.2.5
+@@ -272,6 +272,7 @@ void	setstatclockrate __P((int));
+  * immediately before the system is halted or rebooted.
+  */
+ void	*shutdownhook_establish __P((void (*)(void *), void *));
++void	*shutdownhook_last_establish __P((void (*)(void *), void *));
+ void	shutdownhook_disestablish __P((void *));
+ void	doshutdownhooks __P((void));
+ 
